@@ -42,7 +42,7 @@ def rsnr_tf(rec, oracle):
     A = tf.concat([tf.expand_dims(Aup, 0), tf.expand_dims(Adw, 0)], 0)
     b = tf.expand_dims(tf.stack([sumIP, sumP], axis=0), 1)
 
-    c = tf.matmul(tf.matrix_inverse(A), b)
+    c = tf.matmul(tf.linalg.inv(A), b)
     rec = tf.gather(c, 0)*rec+tf.gather(c, 1)
     err = tf.reduce_sum((oracle-rec)**2)
     SNR = 10.0*log10_tf(tf.reduce_sum(oracle**2)/err)
@@ -89,8 +89,8 @@ def psnr(refined_img, gt_img):
 
 
 def log10_tf(x):
-    numerator = tf.log(x)
-    denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
+    numerator = tf.math.log(x)
+    denominator = tf.math.log(tf.constant(10, dtype=numerator.dtype))
     return numerator / denominator
 
 
@@ -237,3 +237,15 @@ def _load_whole_data(current_version, file, dump_folder):
     sparse = np.array(f_handle["sparse"])
     print("size of label, ", label.shape)
     print("size of sparse, ", sparse.shape)
+
+
+if __name__ == '__main__':
+    rec = tf.Variable(tf.random.uniform([2, 2]))
+    oracle = tf.Variable(tf.random.uniform([2, 2]))
+    result = rsnr_tf(rec, oracle)
+
+    sess = tf.InteractiveSession()
+    sess.run(tf.global_variables_initializer())
+    ret = sess.run(result)
+    print(ret.shape)
+    print(ret)
