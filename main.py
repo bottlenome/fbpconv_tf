@@ -31,13 +31,14 @@ from tf_unet import util,layers
 from tf_unet.layers import _load_whole_data
 import os
 
-flags=tf.app.flags
-flags.DEFINE_boolean('is_training',True,'training phase/ deploying phase')
+flags = tf.app.flags
+flags.DEFINE_boolean('is_training', True, 'training phase/ deploying phase')
 flags.DEFINE_boolean('is_flipping',True,'flipping augmentation')
 flags.DEFINE_float('lr',1e-4,'learning rate')
 flags.DEFINE_integer('features_root',64,'learning rate')
 flags.DEFINE_integer('layers',5,'number of depth')
 flags.DEFINE_integer('Ngpu',1,'number of GPUs[1/2]')
+flags.DEFINE_integer('batch_size', 10, 'batch size')
 flags.DEFINE_string('optimizer','adam','optimizing algorithm : adam / momentum')
 #flags.DEFINE_string('dump_train','dump_train/','hash file path for train dataset')
 #flags.DEFINE_string('dump_test','dump_test/','hash file path for test dataset')
@@ -56,9 +57,9 @@ if __name__ == '__main__':
     training_iters = 475
     epochs = 100
     display_step = 10
-    restore =conf.restore
-    current_version='fbpconv'
-    current_version_test='fbpconv_test'
+    restore = conf.restore
+    current_version = 'fbpconv'
+    current_version_test = 'fbpconv_test'
     net = unet.Unet(channels=1,
                     n_class=1,
                     layers=conf.layers,
@@ -66,7 +67,7 @@ if __name__ == '__main__':
                     Ngpu=conf.Ngpu,
                     maxpool=conf.maxpool,
                     summaries=True,
-                    cost="euclidean") # cost="dice_coefficient"
+                    cost="euclidean")  # cost="dice_coefficient"
 
     if conf.is_training:
         #file_train='/Volumes/Disk_addition/[2016_07]deconv_ct/fulldata/train_set_biomed.mat'
@@ -82,11 +83,17 @@ if __name__ == '__main__':
         data_loader=image_util.ImageDataProvider_mat(conf.train_path,is_flipping=conf.is_flipping)
         data_loader_test=image_util.ImageDataProvider_mat(conf.test_path,shuffle_data=False,is_flipping=False)
 
-
-        if conf.optimizer=='momentum':
-            trainer = unet.Trainer(net, optimizer="momentum", opt_kwargs=dict(momentum=0.2,learning_rate=conf.lr))
+        if conf.optimizer == 'momentum':
+            trainer = unet.Trainer(net,
+                                   batch_size=conf.batch_size,
+                                   optimizer="momentum",
+                                   opt_kwargs=dict(momentum=0.2,
+                                                   learning_rate=conf.lr))
         else:
-            trainer = unet.Trainer(net, optimizer="adam", opt_kwargs=dict(learning_rate=conf.lr))
+            trainer = unet.Trainer(net,
+                                   batch_size=conf.batch_size,
+                                   optimizer="adam",
+                                   opt_kwargs=dict(learning_rate=conf.lr))
 
         path = trainer.train(data_loader,data_loader_test,
                 conf.output_path+'train/',conf.output_path+'test/',
