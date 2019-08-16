@@ -17,9 +17,11 @@ Created on Jul 28, 2016
 
 author: jakeret
 '''
-from __future__ import print_function, division, absolute_import, unicode_literals
+from __future__ import print_function, division
+from __future__ import absolute_import, unicode_literals
 
 import os
+import sys
 import shutil
 import numpy as np
 from collections import OrderedDict
@@ -377,7 +379,7 @@ class Trainer(object):
 
         tf.summary.scalar('loss', self.net.cost)
         tf.summary.scalar('rsnr', self.net.rsnr)
-        #tf.summary.scalar('accuracy', self.net.accuracy)
+        # tf.summary.scalar('accuracy', self.net.accuracy)
 
         self.optimizer = self._get_optimizer(training_iters, global_step)
         print("get optimizer")
@@ -406,7 +408,7 @@ class Trainer(object):
 
         return init
 
-    def train(self, data_provider, data_provider_test, output_path, output_path_test, training_iters=10, epochs=100, display_step=1, restore=False, write_graph=False, prediction_path = 'prediction'):
+    def train(self, data_provider, data_provider_test, output_path, output_path_test, training_iters=10, epochs=100, display_step=1, restore=False, write_graph=False, prediction_path='prediction'):
         """
         Lauches the training process
 
@@ -438,44 +440,59 @@ class Trainer(object):
                 if ckpt and ckpt.model_checkpoint_path:
                     self.net.restore(sess, ckpt.model_checkpoint_path)
 
-            #test_x, test_y = data_provider(self.verification_batch_size)
-            #pred_shape = self.store_prediction(sess, test_x, test_y, "_init")
+            # test_x, test_y = data_provider(self.verification_batch_size)
+            # pred_shape = self.store_prediction(sess, test_x, test_y, "_init")
 
-            summary_writer = tf.summary.FileWriter(output_path, graph=sess.graph)
-            summary_writer_test = tf.summary.FileWriter(output_path_test, graph=sess.graph)
+            summary_writer = tf.summary.FileWriter(output_path,
+                                                   graph=sess.graph)
+            summary_writer_test = tf.summary.FileWriter(output_path_test,
+                                                        graph=sess.graph)
             logging.info("Start optimization")
 
-            cur_step=self.tstep.eval()
-            cur_epoch=cur_step//training_iters
-            #cur_epoch=self.t_op.eval()
-            print("cur_step",cur_step)
-            print("cur_epoch",cur_epoch)
+            cur_step = self.tstep.eval()
+            cur_epoch = cur_step//training_iters
+            # cur_epoch=self.t_op.eval()
+            print("total epochs", epochs)
+            print("batch size", self.batch_size)
+            print("cur_step", cur_step)
+            print("cur_epoch", cur_epoch)
             avg_gradients = None
-            for epoch in range(cur_epoch,epochs):
+            for epoch in range(cur_epoch, epochs):
+                print("epoch {}".format(epoch))
                 total_loss = 0
                 lr = sess.run((self.learning_rate_node))
-                for step in range(np.maximum(epoch*training_iters,cur_step), ((epoch+1)*training_iters)):
-                #for step in range((epoch*training_iters), ((epoch+1)*training_iters)):
+                for step in range(np.maximum(epoch*training_iters,
+                                             cur_step),
+                                  ((epoch+1)*training_iters)):
                     batch_x, batch_y = data_provider(self.batch_size)
 
                     # Run optimization op (backprop)
-                    _, loss, lr, gradients = sess.run((self.optimizer, self.net.cost, self.learning_rate_node, self.net.gradients_node),
-                                                      feed_dict={self.net.x: batch_x,
-                                                                 self.net.y: batch_y,
-                                                                 self.net.keep_prob: 1.})
+                    results = sess.run((self.optimizer,
+                                        self.net.cost,
+                                        self.learning_rate_node,
+                                        self.net.gradients_node),
+                                       feed_dict={self.net.x: batch_x,
+                                                  self.net.y: batch_y,
+                                                  self.net.keep_prob: 1.})
+                    _, loss, lr, gradients = results
+                    print("step {} loss : {}".format(step, loss), end="\r")
+                    sys.stdout.flush()
+
                     if self.net.summaries and self.norm_grads:
                         avg_gradients = _update_avg_gradients(avg_gradients, gradients, step)
                         norm_gradients = [np.linalg.norm(gradient) for gradient in avg_gradients]
                         self.norm_gradients_node.assign(norm_gradients).eval()
-
+                    """
                     if step % display_step == 0:
                         self.output_minibatch_stats(sess, summary_writer, step, batch_x, batch_y)
                     if step % (display_step*10) == 0:
                         ind_x, ind_y = data_provider_test(self.batch_size)
                         self.output_minibatch_stats(sess, summary_writer_test, step, ind_x, ind_y)
+                    """
 
                     self.tstep.assign(step).eval()
                     total_loss += loss
+                print()
 
                 self.output_epoch_stats(epoch, total_loss, training_iters, lr)
                 #self.store_prediction(sess, test_x, test_y, "epoch_%s"%epoch)
