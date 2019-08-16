@@ -240,12 +240,36 @@ def _load_whole_data(current_version, file, dump_folder):
 
 
 if __name__ == '__main__':
-    rec = tf.Variable(tf.random.uniform([2, 2]))
-    oracle = tf.Variable(tf.random.uniform([2, 2]))
-    result = rsnr_tf(rec, oracle)
+    n_class = 1
+    channels = 1
+    x = tf.placeholder("float", shape=[None, None, None, channels])
+    logits = x
+    predicter = logits
+    y = tf.placeholder("float", shape=[None, None, None, n_class])
+
+    flat_logits = tf.reshape(logits, [-1, n_class])
+    flat_labels = tf.reshape(y, [-1, n_class])
+    cost = 100.0*tf.reduce_mean(tf.square(tf.abs(flat_logits-flat_labels)))
+    rsnr = tf.reduce_mean(rsnr_tf(predicter, y))
+
+    tf.summary.scalar('loss', cost)
+    tf.summary.scalar('rsnr', rsnr)
+    learning_rate_node = tf.Variable(1)
+    tf.summary.scalar('learning_rate', learning_rate_node)
+    summary_op = tf.summary.merge_all()
 
     sess = tf.InteractiveSession()
-    sess.run(tf.global_variables_initializer())
-    ret = sess.run(result)
-    print(ret.shape)
-    print(ret)
+    sess.run(tf.compat.v1.global_variables_initializer())
+
+    x_test = np.random.uniform(-1., 1., (1, 512, 512, 1))
+    y_test = np.random.uniform(-1., 1., (1, 512, 512, 1))
+    print(x_test.shape)
+    print(y_test.shape)
+
+    ret = sess.run([summary_op, cost, rsnr, predicter],
+                   feed_dict={x: x_test, y: y_test})
+    for i in ret:
+        if type(i) == str:
+            print(i)
+        else:
+            print(i.shape)
